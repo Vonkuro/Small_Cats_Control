@@ -21,11 +21,14 @@ jobs:
 
     - name: Deploy to ECS
       env:
-        AWS_REGION: us-east-1
+        AWS_DEFAULT_REGION: us-east-1
         AWS_ACCESS_KEY_ID: 536826959354
-        AWS_SECRET_ACCESS_KEY: ${{ secrets.ECR_LOGIN_PASSWORD }}
         ECS_CLUSTER: my-ecs-cluster
-        ECS_SERVICE: my-ecs-service
+        ECS_SERVICE: smallCat
         IMAGE_URI: 065334477167.dkr.ecr.us-east-1.amazonaws.com/my-smallapp:latest
       run: |
-        aws ecs update-service --cluster $ECS_CLUSTER --service $ECS_SERVICE --force-new-deployment --region $AWS_REGION --desired-count 1
+        - TASK_DEFINITION=$(aws ecs describe-task-definition --task-definition "smallCat" --region "$AWS_DEFAULT_REGION")
+        - NEW_TASK_DEFINITION=$(echo $TASK_DEFINITION | jq --arg IMAGE "$IMAGE_URI" '.taskDefinition | .containerDefinitions[0].image = $IMAGE | del(.taskDefinitionArn) | del(.revision) | del(.status) | del(.requiresAttributes) | del(.compatibilities) |  del(.registeredAt)  | del(.registeredBy)')
+        - NEW_TASK_INFO=$(aws ecs register-task-definition --region "$AWS_DEFAULT_REGION" --cli-input-json "$NEW_TASK_DEFINITION")
+        - NEW_REVISION=$(echo $NEW_TASK_INFO | jq '.taskDefinition.revision')
+        - aws ecs update-service --cluster ${ECS_CLUSTER} --service ${ECS_SERVICE} --task-definition smallCat:${NEW_REVISION}
